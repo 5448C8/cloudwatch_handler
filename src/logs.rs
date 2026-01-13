@@ -144,7 +144,7 @@ async fn logs_worker(
   let mut interval = tokio::time::interval(config.flush_interval);
 
   // Ensure log group and stream exist (best effort)
-  let _ = ensure_log_group_and_stream(&client, &config.log_group, &config.log_stream).await;
+  let _ = ensure_log_stream(&client, &config.log_group, &config.log_stream).await;
 
   loop {
     tokio::select! {
@@ -178,26 +178,12 @@ async fn logs_worker(
   }
 }
 
-async fn ensure_log_group_and_stream(
+async fn ensure_log_stream(
   client: &CloudWatchLogsClient,
   group: &str,
   stream: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
   // Best-effort creation.
-  // Only report errors that are not "already exists".
-  if let Err(err) = client.create_log_group().log_group_name(group).send().await {
-    let is_already_exists = err.as_service_error().is_some_and(|service_error| {
-      matches!(
-        service_error,
-        aws_sdk_cloudwatchlogs::operation::create_log_group::CreateLogGroupError::ResourceAlreadyExistsException(_)
-      )
-    });
-
-    if !is_already_exists {
-      sentry::capture_error(&err);
-      eprintln!("CloudWatchLogs CreateLogGroup failed: {err:?}");
-    }
-  }
 
   if let Err(err) = client
     .create_log_stream()
